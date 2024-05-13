@@ -31,7 +31,7 @@ The model is given by the following equation:
 
 $$Y_t=(\beta_6 * (\boldsymbol{\beta} \cdot \bf{V}) + \beta_7)^2 $$
 
-where $\boldsymbol{\beta} = \{ \beta_1, \beta_2,\beta_3, \beta_4,\beta_5 \}$
+where $\boldsymbol{\beta} = \\{ \beta_1, \beta_2,\beta_3, \beta_4,\beta_5 \\}$
 is a vector of coefficients and $\bf{V}$ is a vector of temperature,
 flow, sun, phosphorus, and silicon time series data at time $t$.
 
