@@ -1,4 +1,4 @@
-# River Thames Algae Blooms - Dissertation
+# River Thames Phytoplankton Blooms - Dissertation
 ## Stefan Walzer-Goldfeld
 
 ### Multi-Parameter Plot
