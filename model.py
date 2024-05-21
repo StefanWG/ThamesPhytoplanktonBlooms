@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from utils import *
 from scipy.optimize import curve_fit
 
+# TODO: Add verbose option
+
 class Model(ABC):
     '''
     Abstract class for model. Provides wrapper for 
@@ -25,8 +27,9 @@ class Model(ABC):
     dates = None
     passYtoModel = False # True if y time series should be passed to the model
 
-    def __init__(self,sigma=3, splitWeek = 409):
-        data = readData()
+    def __init__(self,location, sigma=3, splitWeek = 409):
+        self.location = location
+        data = readData(location)
         # Initialize self.xData
         for xVar in self.xVariables:
             smoothed = getSmoothedData(data["date"], data[xVar], sigma)
@@ -41,6 +44,11 @@ class Model(ABC):
         # Intiialize self.dates
         weeksSinceStart = [((i - data["date"][0]).days + 1) // 7 + 1 for i in data["date"]]
         self.dates = [data["date"][0] + pd.Timedelta(weeks=i) for i in range(max(weeksSinceStart))]
+
+        if self.splitWeek > len(data)*0.75:
+            self.splitWeek = int(len(data)*0.75)
+
+    # TODO: Pick splitweek smartly - ie. start of year
 
 
     @property
@@ -100,18 +108,18 @@ class Model(ABC):
 
         return validResults
     
-    def plot(self, calibrate=True, validate=True, output=None):
+    def plot(self, toCalibrate=True, toValidate=True, output=None):
         '''
         Plot model output for all yVariables. Plot calibration,
         validation, or both.
         '''
-        assert calibrate or validate # One must be true
+        assert toCalibrate or toValidate # One must be true
 
         calibParameters = self.calibrate()
         xCalib = {x:self.xData[x][:self.splitWeek] for x in self.xVariables}
 
 
-        if validate:
+        if toValidate:
             validResults = self.validate(calibParameters)
 
         fig = plt.figure(figsize=(8,8))
@@ -122,6 +130,7 @@ class Model(ABC):
             "n-chloro":"Nano-chlorophytes", 
             "p-chloro":"Pico-chlorophytes",
             "totCyano":"Cyanobacteria",
+            "chl":"Chlorophyll-a"
         }
 
         fig.tight_layout()
@@ -134,14 +143,14 @@ class Model(ABC):
             if self.passYtoModel:
                 xCalib["y"] = self.yData[yVar][:self.splitWeek]
 
-            if calibrate:
+            if toCalibrate:
                 ax.plot(self.dates[:self.splitWeek], self.yData[yVar][:self.splitWeek], "k-", label='Observed')
                 ax.plot(self.dates[:self.splitWeek], self.model(xCalib, *calibParameters[yVar]),"r--", label='Model')
 
-            if validate:
+            if toValidate:
                 ax.plot(self.dates[self.splitWeek:], self.yData[yVar][self.splitWeek:], "k-", label='Observed')
                 ax.plot(self.dates[self.splitWeek:], validResults[yVar]["Y"],"r--", label='Model')
-            if calibrate and validate:
+            if toCalibrate and toValidate:
                 ax.axvline(self.dates[self.splitWeek], color="k", ls=':')
             
             ax.xaxis.set_major_locator(years)

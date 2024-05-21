@@ -15,7 +15,7 @@ class LinModel(Model):
     '''
 
     xVariables = ["flow","temp","sun3d","SRP","silicon"]
-    yVariables = ["diatoms","n-chloro", "p-chloro","totCyano"]
+    yVariables = ["diatoms","n-chloro", "p-chloro","totCyano", "chl"]
     
     def model(self, x, a,b,c,d, e,f,z):
         '''
@@ -50,7 +50,9 @@ class LinModel(Model):
         S = x["sun3d"] # Sun (3 day avg)
         SRP = x["SRP"] # Soluble reactive phosphorus
         SIL = x["silicon"] # Silicon
-        Y = ((a*F + b*T + c*S + d*SRP+e*SIL)*z+ f)**2
+        Y = ((a*F + b*T + c*S + d*SRP+e*SIL)*z+ f) **2
+
+        # Y = [max(y,0) for y in Y] include if no exponent
         return Y
     
     def runModel(self):
@@ -58,6 +60,7 @@ class LinModel(Model):
         out = self.model(xD, 1,1,1,1,1,1,1)
         
 
-l = LinModel()
-l.plot(output="figures/linModel.png")
+# l = LinModel()
+# l.plot()
+# l.plot(output="figures/linModel.png")
 

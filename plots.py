@@ -5,62 +5,73 @@ import matplotlib.dates as mdates
 from datetime import datetime
 from copy import deepcopy
 from utils import *
+import sys
 
 plt.rcParams['text.usetex'] = True
 
 import warnings
 warnings.filterwarnings("ignore")
 
-data = readData()
+# TODO: make this robust
+args = sys.argv 
 
+output = args[1]
+loc = args[2]
+
+data=readData(loc)
 ##########################
 # Multiple paramter plots
 ##########################
 fig = plt.figure(figsize=(9, 12))
 
-vars = ["diatoms", "n-chloro", "p-chloro", "totCyano"]
-labs = ["Diatoms", "Nano-chlorophytes", "Pico-chlorophytes", "Cyanobacteria"]
-for var, row, c in zip(vars, [1,2,3,4], ["b","r", "g", "y"]):
+vars = ["diatoms", "n-chloro", "p-chloro", "totCyano", "chl"]
+labs = ["Diatoms", "Nano-chlorophytes", "Pico-chlorophytes", "Cyanobacteria", "Chlorophyll"]
+for var, row, c in zip(vars, [1,2,3,4,5], ["b","r", "g", "y", "k"]):
     for col in [1,2,3]:
         increases = deepcopy(data)
         increases["diff"] = increases[var].diff()
         diffs = increases[increases["diff"] > 0]
 
-        ax = fig.add_subplot(4,3,(row-1)*3+col)
+        ax = fig.add_subplot(len(vars),3,(row-1)*3+col)
+
+        diffScale = 100/max(diffs["diff"])
+
         if col == 1: # Temp and Flow, Algae type text
-            ax.scatter(diffs["temp"], diffs["flow"], diffs["diff"]/1000,
+            ax.scatter(diffs["temp"], diffs["flow"], diffs["diff"]*diffScale,
                     edgecolors='black', c=[c]*len(diffs))
-            ax.text(17, 250, s=labs[row-1], ha="center", color=c)
+            ax.text(max(diffs["temp"])*17/25, max(diffs["flow"])*5/6, s=labs[row-1], ha="center", color=c)
         elif col == 2:  # Temp and Sun
-            ax.scatter(diffs["temp"], diffs["sun3d"], diffs["diff"]/1000,
+            ax.scatter(diffs["temp"], diffs["sun3d"], diffs["diff"]*diffScale,
                     edgecolors='black', c=[c]*len(diffs))
         elif col == 3: # Flow and Sun, Legend
-            scatter = ax.scatter(diffs["flow"], diffs["sun3d"], s=diffs["diff"]/1000,
+            scatter = ax.scatter(diffs["flow"], diffs["sun3d"], diffs["diff"]*diffScale,
                     edgecolors='black', c=[c]*len(diffs))
-            kw = dict(prop="sizes", num=3, color=c, func=lambda s: s*1000)
+            kw = dict(prop="sizes", num=3, color=c, func=lambda s: s / diffScale)
             handles, labels = scatter.legend_elements(**kw)
             ax.legend(handles, labels, loc="upper right")    
-        if row == 4: # X axis labels
+        if row == len(vars): # X axis labels
             xlabels = ["Water Temperature (°C)", "Water Temperature (°C)", r'River Flow (m$^3$/s)']
             ax.set_xlabel(xlabels[col-1])          
 # Y axis labels           
-fig.tight_layout(w_pad=2.0)
-fig.text(-0.01, 0.52, r'River Flow (m$^3$/s)', va='center', rotation='vertical')
-fig.text(0.34, 0.52, 'Solar Radiation (3 Day Mean)', va='center', rotation='vertical')
-fig.text(0.67, 0.52, 'Solar Radiation (3 Day Mean)', va='center', rotation='vertical')
+fig.tight_layout(w_pad=3.0)
+fig.text(-0.02, 0.52, r'River Flow (m$^3$/s)', va='center', rotation='vertical')
+fig.text(0.33, 0.52, 'Sunlight Hours (3 Day Mean)', va='center', rotation='vertical')
+fig.text(0.67, 0.52, 'Sunlight Hours (3 Day Mean)', va='center', rotation='vertical')
 
 
-plt.savefig("figures/multiParamCells.jpg", bbox_inches='tight')
+plt.savefig(f"{output}multiParamCells.jpg", bbox_inches='tight')
 # TODO: Size of text, border on legends, scales dont match, add boxes (using thresholds)
-
+# TODO: Size of bubbles
 ##########################
 # Time series plots
 ##########################
 
+# TODO: Adjust prominence
+
 weeksSinceStart = [((i - data["date"][0]).days + 1) // 7 + 1 for i in data["date"]]
 
 dates = [data["date"][0] + pd.Timedelta(weeks=i) for i in range(max(weeksSinceStart))]
-xvars = ["diatoms", "n-chloro", "p-chloro", "totCyano", "totPhyto"]
+xvars = ["diatoms", "n-chloro", "p-chloro", "totCyano", "totPhyto", "chl"]
 # xvars = ["diatoms"]
 for xvar in xvars:
     fig = plt.figure(figsize=(12, 8)) 
@@ -68,11 +79,12 @@ for xvar in xvars:
     labels = {"diatoms":"Diatom Cells\n(m/l)", 
             "temp":"Water Temperature\n(°C)",
             "flow":r'River Flow' "\n" r'(m$^3$/s)',
-            "sun3d":r'Solar Radiation' "\n" r'(W/m$^2$)',
+            "sun3d":'Sunlight Hours\n3 Day Mean)',
             "n-chloro":"Nano-chlorophytes\n(m/l)", 
             "p-chloro":"Pico-chlorophytes\n(m/l)",
             "totCyano":"Cyanobacteria\n(m/l)",
-            "totPhyto":"Total Phytoplankton\n(m/l)"
+            "totPhyto":"Total Phytoplankton\n(m/l)",
+            "chl":"Chlorophyll"
         }
     axes = []
     smoothed, peaks, mins, maxs  = getBlooms(data["date"], data[xvar], 3)
@@ -139,7 +151,7 @@ for xvar in xvars:
     fig.legend([h[idx] for idx in order], [l[idx] for idx in order], loc = "lower center", ncol=3)
     handles = [h.set_color("tab:red") for h in handles]
 
-    plt.savefig(f'figures/{xvar.replace("-","")}.jpg', bbox_inches="tight")
+    plt.savefig(f'{output}{xvar.replace("-","")}.jpg', bbox_inches="tight")
 
-print("Figures have been saved to ./figure directory")
+print(f"Figures have been saved to {output}")
 
