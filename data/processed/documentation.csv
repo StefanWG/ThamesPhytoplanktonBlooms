@@ -1,0 +1,16 @@
+name,fullName,unit
+date,Date,
+temp,Temperature,°C
+flow,River Flow,m3/s
+SRP,Soluble Reactive Phosphorus,µg/l
+sun3d,Sunlight (3 Day Mean),Hours
+sun,Sunlight,Hours
+silicon,Dissolved Silicon (SI),mg/l
+nitrate,Dissolved Nitrate (NO3),mg/l
+chl,Chlorophyll-a,µg/l
+diatoms,Diatoms,Cell Count
+p-chloro,Pico-chlorophytes,Cell Count
+n-chloro,Nano-chlorophytes,Cell Count
+totCyano,Total Cyanobacteria,Cell Count
+totCrypto,Total Cryptophytes,Cell Count
+totPhyto,Total Phytoplankton,Cell Count
