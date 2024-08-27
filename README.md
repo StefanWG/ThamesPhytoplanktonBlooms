@@ -1,53 +1,76 @@
 # River Thames Phytoplankton Blooms - Dissertation
 ## Stefan Walzer-Goldfeld
 
-### Multi-Parameter Plot
-<img src="figures/multiParamCells.jpg" alt="drawing" width="600"/>
+This repository contains the follwoing tools:
+- Methods for Identifying Blooms From Time Series Data 
+    - Knee of CDF Method
+    - Peak Identification Method
+- Predictive Lag Model
+- Mechanistic Monod-based model
 
-### Time Series Plots
-**Diatoms**
+Below are examples of how to use each tool. 
 
-<img src="figures/diatoms.jpg" alt="diatoms" width="600"/>
+### Bloom Identification and Thresholds
+The knee method is used in the follow manner: 
 
-**Nano-Chlorophytes**
+```
+from blooms import KneeIdentification
 
-<img src="figures/nchloro.jpg" alt="nchloro" width="600"/>
+location = "runnymede"
+target = "diatoms"
+kneeModel = KneeIdentifcation(location, target)
+kneeModel.calibrate()
+blooms = kneeModel.getBlooms() # np.array; 1 if week is a bloom, 0 otherwise
+thresholds = kneeModel.getThresholds() # dict
+```
 
-**Pico-Chlorophytes**
+The peak identificaiton method uses the `PeakIdentification`
+class and is used in the same manner.
 
-<img src="figures/pchloro.jpg" alt="pchloro" width="600"/>
+### Lag Model
+The lag model is used in the follow manner:
 
-**Total Cyanobacteria**
+```
+from lagModel import lagModel 
+from utils import TYPE
 
-<img src="figures/totCyano.jpg" alt="totCyana" width="600"/>
+start = 1
+location = "runnymede"
+target = "diatoms"
+split = 0.7
+popts = lagModel(location, target, start=start, split=split,
+                 type=TYPE.CALIBRATION)
 
-**Total Phytoplankton**
+preds = lagModel(location, target, start=start, split=split,
+                 type=TYPE.VALIDATION) # Predictions
+```
 
-<img src="figures/totPhyto.jpg" alt="totPhyto" width="600"/>
+### Monod-based Model
+```
+from mondModel import mondModel 
+from utils import TYPE
 
-### Simple Model 
+location = "runnymede"
+target = "diatoms"
+split = 0.7
+popts = lagModel(location, target, split=split,
+                 type=TYPE.CALIBRATION)
 
-This model is given by the following equation:
+preds = lagModel(location, target, split=split,
+                 type=TYPE.VALIDATION) # Predictions
+```
 
-$$Y_t=(\beta_6 * (\boldsymbol{\beta} \cdot \bf{V}) + \beta_7)^2 $$
+### Further Information 
+All tools assume that data can be read using the read
+using the `readData` function. This requires that 
+data has been processed into a specific format. 
+This is done from UKCEH files using 
+`python3 driver.py -c`.
 
-where $\boldsymbol{\beta} = \\{ \beta_1, \beta_2,\beta_3, \beta_4,\beta_5 \\}$
-is a vector of coefficients and $\bf{V}$ is a vector of temperature,
-flow, sun, phosphorus, and silicon time series data at time $t$.
+All locations are found in `utils.LOCATIONS` 
+and phytoplankton groups in `utils.TARGETVARS`.
+For any help with the provided code or with plotting,
+feel free to raise an issue.
 
-<img src="figures/linModel.png" alt="linModel" width="600"/>
-
-### Whitehead and Hornberger (1984) Model 
-
-This model is an implementation of the model developed by Whitehead and Hornberger (1984).
-The original model uses chlorophyll-a as a proxy for phytoplankton cell counts, however 
-this does not. The original model also uses upstream and downstream data, while this 
-implementation uses data from a single location for both upstream and downstream points 
-(i.e. we are computing an instantaneous solution).
-
-<img src="figures/whModel.jpg" alt="whModel" width="600"/>
-
-Note: in some cases, the optimization algorithm does not converge; this is a
-work in progress.
 
 

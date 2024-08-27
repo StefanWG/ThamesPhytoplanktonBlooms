@@ -1,4 +1,3 @@
-
 import numpy as np
 
 def convolve1d(vec, filter):
@@ -8,10 +7,10 @@ def convolve1d(vec, filter):
 
     Inputs:
         - vec (array): vector to convolve
-        - fitler (array): convolution filter
+        - filter (array): convolution filter
 
     Outputs:
-        - vOut (array) convolved vector
+        - vOut (array): convolved vector
     '''
     mid = len(filter) // 2
     # Create output array
@@ -31,25 +30,25 @@ def convolve1d(vec, filter):
         vOut[i] = sum(vFilt * filter) / sum(mask * filter)
     return vOut
 
-def smooth(vec,sigma=None, type="gaussian"):
+def smooth(vec, sigma=None, type="gaussian"):
     '''
     Smooth and gap fill time series data with desired filter.
     Gaps must be 0.0 and not np.nan.
 
-    If gap is large than the size of the filter (6*sigma),
+    If gap is larger than the size of the filter (6*sigma),
     then gap filling will give values of 0.
 
     Inputs:
         - vec (array): time series data
         - sigma (int): sigma for gaussian curve (default: None)
         - type (str): type of filter to use for convolution; either
-                      "gaussian" or "uniform" (default: "gaussian)
+                      "gaussian" or "uniform" (default: "gaussian")
 
     Outputs:
-        - smoothed (array): smoothed and gapfilled time series
+        - smoothed (array): smoothed and gap-filled time series
     '''
     # Create Gaussian Curve
-    x = np.arange(-3*sigma,3*sigma+1)
+    x = np.arange(-3*sigma, 3*sigma+1)
     if type == "gaussian":
         assert sigma is not None
         filter = np.exp((-(x/sigma)**2)/2.0)
@@ -57,30 +56,60 @@ def smooth(vec,sigma=None, type="gaussian"):
         filter = [1.0 for i in x]
     else:
         raise ValueError("Invalid filter type")
-    # Perform Smoothing and Gapfilling
+    # Perform Smoothing and Gap filling
     smoothed = convolve1d(vec, filter)
     return np.array(smoothed)
 
+def linearInterpolation(vec):
+    '''
+    Perform linear interpolation on a time series data.
+
+    Inputs:
+        - vec (array): time series data
+
+    Outputs:
+        - data_interpolated (array): interpolated data
+    '''
+    idxs = np.arange(len(vec))
+    data_interpolated = np.interp(idxs, idxs[~np.isnan(vec)], vec[~np.isnan(vec)])
+
+    return data_interpolated
+
 def getSmoothedData(dates, vec, sigma=None, type="gaussian"):
     '''
-    Get smoothed and gap filled data for column in data table
+    Get smoothed and gap-filled data for a column in the data table.
 
     Inputs:
         - dates (array): list of dates corresponding to time series data
         - vec (array): time series data
         - sigma (int): sigma for gaussian curve (default: None)
         - type (str): type of filter to use for convolution; either
-                      "gaussian" or "uniform" (default: "gaussian)
+                      "gaussian" or "uniform" (default: "gaussian")
 
     Outputs:
-        - smoothed (array): smoothed and gapfilled data
+        - smoothed (array): smoothed and gap-filled data
     '''
     # Create array with entry for each date, dates with gaps have 0
     weeksSinceStart = [((i - dates[0]).days + 1) // 7 + 1 for i in dates]
-    vMap = {a:b for a,b, in zip(weeksSinceStart, vec)}
+    vMap = {a: b for a, b in zip(weeksSinceStart, vec)}
     toSmooth = np.array([vMap[i+1] if i+1 in vMap else 0 for i in range(max(weeksSinceStart))], dtype=float)
     toSmooth[np.isnan(toSmooth)] = 0
     # Smooth
     smoothed = np.array(smooth(toSmooth, sigma, type))
     return smoothed
 
+def getInterpolatedData(dates, vec):
+    '''
+    Get interpolated data for a column in the data table.
+
+    Inputs:
+        - dates (array): list of dates corresponding to time series data
+        - vec (array): time series data
+
+    Outputs:
+        - data_interpolated (array): interpolated data
+    '''
+    weeksSinceStart = [((i - dates[0]).days + 1) // 7 + 1 for i in dates]
+    vMap = {a: b for a, b in zip(weeksSinceStart, vec)}
+    toSmooth = np.array([vMap[i+1] if i+1 in vMap else np.nan for i in range(max(weeksSinceStart))], dtype=float)
+    return linearInterpolation(toSmooth)

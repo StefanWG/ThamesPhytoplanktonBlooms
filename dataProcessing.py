@@ -1,15 +1,38 @@
 import pandas as pd
 import numpy as np
+from utils import *
+from smoothing import *
+import os 
+import datetime 
 
 def readData(loc):
+    '''
+    Read data from a CSV file.
+
+    Inputs:
+        - loc (str): Location of the CSV file.
+
+    Returns:
+        - data (pandas.DataFrame): The loaded data.
+    '''
     data = pd.read_csv(f"data/processed/{loc}.csv")
     data["date"] = pd.to_datetime(data["date"])
     return data
 
-def processData(filePath, vars = ["date","temp","flow","SRP","sun3d","sun","silicon","nitrate",
-                "chl", "diatoms", "p-chloro","n-chloro","totCyano", "totCrypto", "totPhyto"],
+def processData(loc, filePath, vars = COLS,
                 outputFolder = "data/processed"):
-    
+    '''
+    Process data from a CSV file.
+
+    Inputs:
+        - loc (str): Location of the CSV file.
+        - filePath (str): Path to the CSV file.
+        - vars (list): List of variables to include in the processed data. Default is COLS.
+        - outputFolder (str): Output folder for the processed data. Default is "data/processed".
+
+    Returns:
+        None
+    '''
     assert outputFolder != "data" # This will override files
     if outputFolder[-1] == "/":
         outputFolder = outputFolder[:-1]
@@ -40,7 +63,17 @@ def processData(filePath, vars = ["date","temp","flow","SRP","sun3d","sun","sili
         data["date"] = [pd.to_datetime(f"{a}/{b}/20{c}") if not any([i == "-" for i in [a,b,c]]) else np.nan for a, b, c, in zip(m, d, y)]
         data = data[data["temp"] > -900]
         data.reset_index(inplace=True)
-        data.drop(columns=["index"], inplace=True)
+        data.drop(columns=["index", "sun", "sun3d"], inplace=True)
+
+         # Sun
+        closestStations = getClosestSunStations()
+        sunStation = closestStations[closestStations["label"] == loc].iloc[0]["closestStation"]
+        sunData = getSunData(sunStation)
+        sunData["date"] = pd.to_datetime(sunData["date"])
+
+        data = pd.merge(data, sunData, on="date", how="left")
+        data = data.reset_index().drop(columns=["index"])
+        data_obj = data.select_dtypes('object')
 
     else:
         # Clean dates
@@ -71,15 +104,12 @@ def processData(filePath, vars = ["date","temp","flow","SRP","sun3d","sun","sili
         data["totPhyto"] = [a+b+c+d+e for a,b,c,d,e in zip(data["diatoms"], data["totCyano"], data["n-chloro"], data["p-chloro"], data["totCrypto"])]
 
         # Sun
-        rm = readData("runnymede")
-        weeksSinceStart = [((i - rm["date"][0]).days + 1) // 7 + 1 for i in rm["date"]]
-        rm["weeks"] = weeksSinceStart
+        closestStations = getClosestSunStations()
+        sunStation = closestStations[closestStations["label"] == loc].iloc[0]["closestStation"]
+        sunData = getSunData(sunStation)
+        sunData["date"] = pd.to_datetime(sunData["date"])
 
-        data["weeks"] = [((i - rm["date"][0]).days + 1) // 7 + 1 for i in data["date"]]
-        rm = rm[["weeks", "sun", "sun3d"]]
-
-        data = data.merge(rm, on="weeks", how="left")
-
+        data = pd.merge(data, sunData, on="date", how="left")
         data = data.reset_index().drop(columns=["index"])
         data_obj = data.select_dtypes('object')
 
@@ -100,23 +130,80 @@ def processData(filePath, vars = ["date","temp","flow","SRP","sun3d","sun","sili
 
     data = data[vars]
 
+
     data.to_csv(outputFp, index=False)
     print(f"CSV saved to {outputFp}.")
+
+def getSunData(station):
+    '''
+    Get solar radiation data for a specific station.
+
+    Inputs:
+        - station (str): Station name.
+
+    Returns:
+        - dailySR (pandas.DataFrame): Solar radiation data.
+    '''
+    files = os.listdir(f"data/sun/{station}")
+    files = [f for f in files if f != ".DS_Store"]
+
+    df = pd.read_csv(f"data/sun/{station}/{files[0]}", skiprows=75)
+    df = df[df["ob_hour_count"] == 1]
+    df["date"] = pd.to_datetime(df["ob_end_time"])
+    df["date"]  =df["date"].apply(lambda x : datetime.datetime.strftime(x, "%Y-%m-%d"))
+    dailySR = df.groupby(by="date", as_index=False).agg({"glbl_irad_amt":"mean"})
+
+    for f in files[1:]:
+        df = pd.read_csv(f"data/sun/{station}/{f}", skiprows=75)
+        df = df[df["ob_hour_count"] == 1]
+        df["date"] = pd.to_datetime(df["ob_end_time"])
+        df["date"]  =df["date"].apply(lambda x : datetime.datetime.strftime(x, "%Y-%m-%d"))
+        d = df.groupby(by="date", as_index=False).agg({"glbl_irad_amt":"mean"})
+        dailySR = pd.concat([dailySR, d])
+
+
+    dailySR = dailySR.rename(columns={"glbl_irad_amt":"sun"})
+    dailySR = dailySR.sort_values(by="date")
+    dailySR["sun3d"] = dailySR["sun"].rolling(3).mean()
+    return dailySR
+
+def smoothDataset(filePath):
+    '''
+    Smooth the dataset.
+
+    Inputs:
+        - filePath (str): Path to the dataset CSV file.
+
+    Returns:
+        None
+    '''
+    data = pd.read_csv(filePath)
+    data["date"] = pd.to_datetime(data["date"])
+
+    d = {k:getSmoothedData(data['date'], data[k], SIGMA) for k in data.columns[1:]}
+    df = pd.DataFrame(data=d)
+    df["date"] = getGapFilledDates(getWeeksSinceStart(data["date"]), data["date"][0])
+
+    df.to_csv(filePath, index=False)
+
 
 def createCSVDoc(outputFile = "data/processed/documentation.csv"):
     '''
     Create documentation for CSVs.
 
     Inputs:
-        - outputFile (str): file path for output 
+        - outputFile (str): File path for the output CSV.
+
+    Returns:
+        None
     '''
     d = [
         {"name":"date", "fullName": "Date"},
         {"name":"temp", "fullName": "Temperature", "unit":"°C"},
         {"name":"flow", "fullName": "River Flow", "unit":'m3/s'},
         {"name":"SRP", "fullName": "Soluble Reactive Phosphorus", "unit":"µg/l"},
-        {"name":"sun3d", "fullName": "Sunlight (3 Day Mean)", "unit":"Hours"},
-        {"name":"sun", "fullName": "Sunlight", "unit":"Hours"},
+        {"name":"sun3d", "fullName": "Solar Radiation (3 Day Mean)", "unit":"kJ/h"},
+        {"name":"sun", "fullName": "Solar Radition", "unit":"kJ/h"},
         {"name":"silicon", "fullName": "Dissolved Silicon (SI)", "unit":"mg/l"},
         {"name":"nitrate", "fullName": "Dissolved Nitrate (NO3)", "unit":"mg/l"},
         {"name":"chl", "fullName": "Chlorophyll-a", "unit":"µg/l"},
